@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{标题}} - Hermes 互动课件</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#333}
+.slide{max-width:900px;margin:20px auto;background:white;border-radius:16px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,0.1);min-height:500px;position:relative}
+.slide h1{font-size:32px;color:#1a1a2e;margin-bottom:20px}
+.slide h2{font-size:24px;color:#16213e;margin:25px 0 15px;border-left:4px solid #667eea;padding-left:15px}
+.slide h3{font-size:20px;color:#0f3460;margin:20px 0 10px}
+.slide p{font-size:17px;line-height:1.8;margin:10px 0;color:#444}
+.slide .highlight{background:#fff3cd;padding:15px;border-radius:8px;border-left:4px solid #ffc107;margin:15px 0}
+.slide .example{background:#e8f5e9;padding:15px;border-radius:8px;border-left:4px solid #4caf50;margin:15px 0}
+.slide .formula{text-align:center;font-size:22px;padding:20px;margin:15px 0;background:#f8f9fa;border-radius:8px}
+.slide ul,ol{padding-left:25px;font-size:17px;line-height:2}
+.nav-bar{position:fixed;bottom:0;left:0;right:0;background:white;padding:12px 20px;box-shadow:0 -2px 10px rgba(0,0,0,0.1);display:flex;justify-content:center;gap:20px;z-index:100}
+.nav-bar button{padding:10px 25px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;transition:all 0.2s}
+.nav-bar .prev{background:#e0e0e0;color:#333}
+.nav-bar .next{background:#667eea;color:white}
+.nav-bar .voice{background:#ff6b6b;color:white}
+.nav-bar button:hover{transform:translateY(-2px);opacity:0.9}
+.page-info{text-align:center;color:#999;font-size:14px;margin-top:10px}
+.tts-player{position:fixed;bottom:70px;right:20px;background:white;border-radius:12px;padding:10px 15px;box-shadow:0 4px 15px rgba(0,0,0,0.15);display:none;z-index:99}
+.subject-tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;margin-bottom:15px}
+.tag-math{background:#e3f2fd;color:#1565c0}
+.tag-physics{background:#e8f5e9;color:#2e7d32}
+.tag-chemistry{background:#fce4ec;color:#c62828}
+.tag-chinese{background:#f3e5f5;color:#6a1b9a}
+.tag-english{background:#fff3e0;color:#e65100}
+@media(max-width:600px){.slide{padding:20px;margin:10px}.slide h1{font-size:24px}}
+</style>
+</head>
+<body>
+
+<div id="slides-container"></div>
+
+<div class="nav-bar">
+  <button class="prev" onclick="prevSlide()">◀ 上一页</button>
+  <button class="voice" onclick="playCurrent()">🔊 朗读本页</button>
+  <button class="next" onclick="nextSlide()">下一页 ▶</button>
+</div>
+
+<div class="tts-player" id="ttsPlayer">
+  <audio id="audioPlayer" controls style="height:36px"></audio>
+</div>
+
+<script>
+const slides = {{幻灯片数据}};
+let current = 0;
+const TTS_URL = "http://192.168.1.175:8899/tts";
+
+function renderSlide(idx) {
+  const s = slides[idx];
+  let tags = {math:"tag-math",physics:"tag-physics",chemistry:"tag-chemistry",chinese:"tag-chinese",english:"tag-english"};
+  document.getElementById("slides-container").innerHTML =
+    `<div class="slide">
+      ${s.subject ? `<span class="subject-tag ${tags[s.subject]||''}">${s.subject}</span>` : ""}
+      ${s.title ? `<h1>${s.title}</h1>` : ""}
+      ${(s.sections||[]).map(sec =>
+        `<h2>${sec.heading}</h2>${(sec.content||[]).map(c =>
+          c.type==="text" ? `<p>${c.text}</p>` :
+          c.type==="highlight" ? `<div class="highlight">${c.text}</div>` :
+          c.type==="example" ? `<div class="example">${c.text}</div>` :
+          c.type==="formula" ? `<div class="formula">${c.text}</div>` :
+          c.type==="list" ? `<ul>${c.items.map(i=>`<li>${i}</li>`).join("")}</ul>` : ""
+        ).join("")}
+      ).join("")}
+      <div class="page-info">第 ${idx+1}/${slides.length} 页</div>
+    </div>`;
+}
+
+function nextSlide() { if(current < slides.length-1){current++;renderSlide(current)} }
+function prevSlide() { if(current > 0){current--;renderSlide(current)} }
+
+async function playCurrent() {
+  const text = slides[current].sections.map(s=>s.heading+":"+s.content.map(c=>c.text||"").join("")).join(" ");
+  if(!text) return;
+  document.getElementById("ttsPlayer").style.display="block";
+  const player = document.getElementById("audioPlayer");
+  try {
+    const resp = await fetch(TTS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text:text.slice(0,500), voice:"zh-CN-XiaoxiaoNeural"})
+    });
+    const blob = await resp.blob();
+    player.src = URL.createObjectURL(blob);
+    player.play();
+  } catch(e) { alert("语音生成失败"); }
+}
+
+document.addEventListener("keydown", e => {
+  if(e.key==="ArrowRight") nextSlide();
+  if(e.key==="ArrowLeft") prevSlide();
+});
+
+renderSlide(0);
+</script>
+</body>
+</html>
